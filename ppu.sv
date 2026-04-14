@@ -171,19 +171,19 @@ always @(posedge clk) begin
     end else if (rst_cycles == 16'h6AF7) begin
         ppustatus[7] <= 1'b1;
         rst_cycles <= rst_cycles + 1'b1;
-    end else if (rst_cycles < 16'hD4FC) begin
+    end else if (rst_cycles < 16'hDF4B) begin
         rst_cycles <= rst_cycles + 1'b1;       
         if (!cpu_rw && cpu_addr == 3'h2) begin 
-            cpu_dout <= ppuctrl;
+            cpu_dout <= ppustatus;
             ppustatus[7] <= 1'b0;
         end
-    end else if (rst_cycles == 16'hD4FC) begin
+    end else if (rst_cycles == 16'hDF4B) begin
         ppustatus[7] <= 1'b1;
         rst_cycles <= rst_cycles + 1'b1;
-    end else if (rst_cycles == 16'hD4FD) begin
+    end else if (rst_cycles == 16'hDF4C) begin
         rst_cycles <= rst_cycles + 1'b1;                         
         if (!cpu_rw && cpu_addr == 3'h2) begin  
-            cpu_dout <= ppuctrl;
+            cpu_dout <= ppustatus;
             ppustatus[7] <= 1'b0;
         end
     end else begin                              // We can now begin our regular read/write routine
@@ -219,15 +219,16 @@ always @(posedge clk) begin
                         scroll_msb <= 1'b1;
                     end
                     3'h6: ppuaddr <= cpu_din;
+                    3'h7: ppudata <= cpu_din;
                 endcase
             end
         end
         // Example routine (this is for testing purposes and does not model PPU functionality):
         sram_addr <= 14'b1;
-        sram_dout <= oamdata + ppudata;
         sram_wr <= 1'b0;
     end
 end
+assign sram_dout = ppudata + oamdata;
 /*************************************************** PPU Behavioral Definitions ******************************************************/
 
 endmodule
