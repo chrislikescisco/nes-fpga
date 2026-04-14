@@ -159,6 +159,6 @@ always @(posedge clk) begin
     if (rst) begin
         ppuctrl = '0;
         ppumask = '0;
-
+        rst_cycles = '0;
     end
 end
