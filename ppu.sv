@@ -31,16 +31,134 @@ module ppu (                         // For the time being original I/O function
 /*************************************************** PPU I/O Pins ******************************************************/
 
 /*************************************************** PPU Registers ******************************************************/
-// PPUCTRL $2000
-// Bits: VPHB SINN
-//       0123 4567
-// V - NMI (non-maskable interrupt) enable, 
+// Information based on https://www.nesdev.org/wiki/PPU_registers
+// Detailed functional explanations for all registers can be found there
+
+/*  PPUCTRL
+    CPU_ADDR: $2000
+
+    Bits: VPHB SINN
+          7654 3210
+          
+    7   (V)  - Vblank NMI enable
+    6   (P)  - PPU master/slave (unused)
+    5   (H)  - Sprite height
+    4   (B)  - Background tile select
+    3   (S)  - Sprite tile select
+    2   (I)  - Increment mode
+    1-0 (NN) - Nametable select / XY scroll bit 8
+*/
 logic[7:0] ppuctrl;
+
+/*  PPUMASK
+    CPU_ADDR: $2001
+
+    Bits: BGRs bMmG
+          7654 3210
+          
+    7-5 (BGR) - Color emphasis
+    4 (s)     - Sprite enable
+    3 (b)     - Background enable
+    2 (M)     - Sprite left column enable
+    1 (m)     - Background left column enable
+    0 (G)     - Greyscale
+*/
 logic[7:0] ppumask; 
+
+/*  PPUSTATUS
+    CPU_ADDR: $2002
+
+    Bits: VSO- ----
+          7654 3210
+          
+    7 (V) - Vblank
+    6 (S) - Sprite 0 hit
+    5 (O) - Sprite overflow
+*/
 logic[7:0] ppustatus; 
+
+/*  PPUSCROLL
+    CPU_ADDR: $2005
+
+    Bits: X[n]  | OR | Y[n]
+          7-0          7-0
+          
+    7-0: X/Y scroll bits
+*/
 logic[7:0] ppuscroll;
-logic[7:0] ppuaddr;
+
+/*  PPUADDR
+    CPU_ADDR: $2006
+
+    Bits:   --    A[n]
+          15-14   13-0
+          
+    13-0: VRAM address bits
+*/
+logic[15:0] ppuaddr;
+
+/*  PPUDATA
+    CPU_ADDR: $2007
+
+    Bits: D[n]
+          7-0
+          
+    7-0: VRAM data bits
+*/
 logic[7:0] ppudata;
+
+/*  OAMADDR
+    CPU_ADDR: $2003
+
+    Bits: A[n]
+          7-0
+          
+    7-0: OAM address bits
+*/
 logic[7:0] oamaddr; 
+
+/*  OAMDATA
+    CPU_ADDR: $2004
+
+    Bits: D[n]
+          7-0
+          
+    7-0: OAM data bits
+*/
 logic[7:0] oamdata; 
-logic[7:0] oamdma; 
+
+/*  OAMDMA
+    CPU_ADDR: $4014
+
+    Bits: A[n]
+          7-0
+          
+    7-0: OAM DMA address
+*/
+logic[7:0] oamdma;
+/*************************************************** PPU Registers ******************************************************/
+
+logic[15:0] rst_cycles; // The PPU ignores writes for the first 27384 cycles after a reset
+                        // commercial NES games rely on this behavior to function properly,
+                        // so it will be replicated by this design
+
+/*************************************************** PPU Behavioral Definitions ******************************************************/
+// Power-on behavior - see https://www.nesdev.org/wiki/PPU_power_up_state
+initial begin
+    ppuctrl = '0;
+    ppumask = '0;
+    ppuscroll = '0;
+    ppuaddr = '0;
+    ppudata = '0;
+    rst_cycles = '0;
+    ppustatus = '0; // Vblank and overflow are random at startup, but I will leave them at 0 for now
+end
+
+// Running routine
+always @(posedge clk) begin
+    if (rst) begin
+        ppuctrl = '0;
+        ppumask = '0;
+
+    end
+end
