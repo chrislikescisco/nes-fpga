@@ -16,7 +16,7 @@ module ppu (                         // For the time being original I/O function
     input  logic              cs,   // Used to map PPU regs to CPU address space
     input  logic[3:0]     ext_in,   // Supports chaining two PPUs together, unused in the original console
     output logic[3:0]    ext_out,   // Replaced with RGB in later models, which we may also do
-    output logic             int,   // Interrupt pin that feeds into CPU
+    output logic       interrupt,   // Interrupt pin that feeds into CPU
 
     // SRAM Pins:
     output logic[13:0] sram_addr,   // Address bits for SRAM
@@ -192,7 +192,7 @@ always @(posedge clk) begin
                 3'h0: begin
                     cpu_dout <= ppustatus;
                     foreach(ppustatus[i]) // Clear status flags after read
-                        ppustatus[i] == 1'b1 -> ppustatus[i] <= 1'b0;
+                        ppustatus[i] <= 1'b0;
                 end
                 3'h4: begin
                     cpu_dout <= oamdata;
@@ -219,9 +219,9 @@ always @(posedge clk) begin
                         scroll_msb <= 1'b1;
                     end
                     3'h6: ppuaddr <= cpu_din;
-                    default: 
                 endcase
             end
         end
     end
 end
+endmodule
