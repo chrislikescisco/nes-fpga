@@ -222,6 +222,12 @@ always @(posedge clk) begin
                 endcase
             end
         end
+        // Example routine (this is for testing purposes and does not model PPU functionality):
+        sram_addr <= 14'b1;
+        sram_dout <= oamdata + ppudata;
+        sram_wr <= 1'b0;
     end
 end
+/*************************************************** PPU Behavioral Definitions ******************************************************/
+
 endmodule
