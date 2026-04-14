@@ -35,7 +35,7 @@ module ppu (                         // For the time being original I/O function
 // Detailed functional explanations for all registers can be found there
 
 /*  PPUCTRL
-    CPU_ADDR: $2000
+    CPU_ADDR: 0
 
     Bits: VPHB SINN
           7654 3210
@@ -51,7 +51,7 @@ module ppu (                         // For the time being original I/O function
 logic[7:0] ppuctrl;
 
 /*  PPUMASK
-    CPU_ADDR: $2001
+    CPU_ADDR: 1
 
     Bits: BGRs bMmG
           7654 3210
@@ -66,7 +66,7 @@ logic[7:0] ppuctrl;
 logic[7:0] ppumask; 
 
 /*  PPUSTATUS
-    CPU_ADDR: $2002
+    CPU_ADDR: 2
 
     Bits: VSO- ----
           7654 3210
@@ -78,7 +78,7 @@ logic[7:0] ppumask;
 logic[7:0] ppustatus; 
 
 /*  PPUSCROLL
-    CPU_ADDR: $2005
+    CPU_ADDR: 5
 
     Bits: X[n]  | OR | Y[n]
           7-0          7-0
@@ -88,7 +88,7 @@ logic[7:0] ppustatus;
 logic[7:0] ppuscroll;
 
 /*  PPUADDR
-    CPU_ADDR: $2006
+    CPU_ADDR: 6
 
     Bits:   --    A[n]
           15-14   13-0
@@ -98,7 +98,7 @@ logic[7:0] ppuscroll;
 logic[15:0] ppuaddr;
 
 /*  PPUDATA
-    CPU_ADDR: $2007
+    CPU_ADDR: 7
 
     Bits: D[n]
           7-0
@@ -108,7 +108,7 @@ logic[15:0] ppuaddr;
 logic[7:0] ppudata;
 
 /*  OAMADDR
-    CPU_ADDR: $2003
+    CPU_ADDR: 3
 
     Bits: A[n]
           7-0
@@ -118,7 +118,7 @@ logic[7:0] ppudata;
 logic[7:0] oamaddr; 
 
 /*  OAMDATA
-    CPU_ADDR: $2004
+    CPU_ADDR: 4
 
     Bits: D[n]
           7-0
@@ -138,11 +138,12 @@ logic[7:0] oamdata;
 logic[7:0] oamdma;
 /*************************************************** PPU Registers ******************************************************/
 
-logic[15:0] rst_cycles; // The PPU ignores writes for the first 27384 cycles after a reset
-                        // commercial NES games rely on this behavior to function properly,
-                        // so it will be replicated by this design
 
 /*************************************************** PPU Behavioral Definitions ******************************************************/
+logic[15:0] rst_cycles; // The PPU ignores writes for the first 29658 cycles after a reset.
+                        // Commercial NES games rely on this behavior to function properly,
+                        // so it will be replicated by this design
+
 // Power-on behavior - see https://www.nesdev.org/wiki/PPU_power_up_state
 initial begin
     ppuctrl = '0;
@@ -157,8 +158,33 @@ end
 // Running routine
 always @(posedge clk) begin
     if (rst) begin
-        ppuctrl = '0;
-        ppumask = '0;
-        rst_cycles = '0;
+        ppuctrl <= '0;
+        ppumask <= '0;
+        rst_cycles <= '0;
+    end else if (rst_cycles < 16'h6AF7) begin // The vblank flab is set once at 27384 cycles, then again at 57165 cycles
+        rst_cycles++;                         // this behavior is used by NES games to determine that 29658 cycles have
+        if (!cpu_rw && cpu_addr == 3'h0) begin  // passed and they can begin writing to the contents of the registers
+            ppuctrl[7] <= '0;
+        end       
+    end else if (rst_cycles == 16'h6AF7) begin
+        ppuctrl[7] <= 1'b1;
+        rst_cycles++;
+    end else if (rst_cycles < 16'hD4FC) begin
+        rst_cycles++;                         // this behavior is used by NES games to determine that 29658 cycles have
+        if (!cpu_rw && cpu_addr == 3'h0) begin  // passed and they can begin writing to the contents of the registers
+            ppuctrl[7] <= '0;
+        end
+    end else if (rst_cycles == 16'hD4FC) begin
+        ppuctrl[7] <= 1'b1;
+        rst_cycles++;
+    end else (rst_cycles == 16'hD4FD) begin
+        rst_cycles++;                         
+        if (!cpu_rw && cpu_addr == 3'h0) begin  
+            ppuctrl[7] <= '0;
+        end
+    end else begin // We can now begin our regular read/write routine
+        if (!cpu_rw) begin
+            
+        end
     end
 end
