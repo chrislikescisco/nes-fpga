@@ -135,7 +135,7 @@ logic[7:0] oamdata;
           
     7-0: OAM DMA address
 */
-logic[7:0] oamdma;
+logic[7:0] oamdma; // Not implemented at this time
 /*************************************************** PPU Registers ******************************************************/
 
 
@@ -143,7 +143,7 @@ logic[7:0] oamdma;
 logic[15:0] rst_cycles; // The PPU ignores writes for the first 29658 cycles after a reset.
                         // Commercial NES games rely on this behavior to function properly,
                         // so it will be replicated by this design
-
+logic scroll_msb;
 // Power-on behavior - see https://www.nesdev.org/wiki/PPU_power_up_state
 initial begin
     ppuctrl = '0;
@@ -152,6 +152,7 @@ initial begin
     ppuaddr = '0;
     ppudata = '0;
     rst_cycles = '0;
+    scroll_msb = 1'b0;
     ppustatus = '0; // Vblank and overflow are random at startup, but I will leave them at 0 for now
 end
 
@@ -161,30 +162,66 @@ always @(posedge clk) begin
         ppuctrl <= '0;
         ppumask <= '0;
         rst_cycles <= '0;
-    end else if (rst_cycles < 16'h6AF7) begin // The vblank flab is set once at 27384 cycles, then again at 57165 cycles
-        rst_cycles++;                         // this behavior is used by NES games to determine that 29658 cycles have
-        if (!cpu_rw && cpu_addr == 3'h0) begin  // passed and they can begin writing to the contents of the registers
-            ppuctrl[7] <= '0;
+        scroll_msb <= 1'b0;
+    end else if (rst_cycles < 16'h6AF7) begin   // The vblank flag is set once at 27384 cycles, then again at 57165 cycles
+        rst_cycles <= rst_cycles + 1'b1;        // this behavior is used by NES games to determine that 29658 cycles have
+        if (!cpu_rw && cpu_addr == 3'h2) begin  // passed and they can begin writing to the contents of the registers
+            ppustatus[7] <= '0;
         end       
     end else if (rst_cycles == 16'h6AF7) begin
-        ppuctrl[7] <= 1'b1;
-        rst_cycles++;
+        ppustatus[7] <= 1'b1;
+        rst_cycles <= rst_cycles + 1'b1;
     end else if (rst_cycles < 16'hD4FC) begin
-        rst_cycles++;                         // this behavior is used by NES games to determine that 29658 cycles have
-        if (!cpu_rw && cpu_addr == 3'h0) begin  // passed and they can begin writing to the contents of the registers
-            ppuctrl[7] <= '0;
+        rst_cycles <= rst_cycles + 1'b1;       
+        if (!cpu_rw && cpu_addr == 3'h2) begin 
+            cpu_dout <= ppuctrl;
+            ppustatus[7] <= 1'b0;
         end
     end else if (rst_cycles == 16'hD4FC) begin
-        ppuctrl[7] <= 1'b1;
-        rst_cycles++;
-    end else (rst_cycles == 16'hD4FD) begin
-        rst_cycles++;                         
-        if (!cpu_rw && cpu_addr == 3'h0) begin  
-            ppuctrl[7] <= '0;
+        ppustatus[7] <= 1'b1;
+        rst_cycles <= rst_cycles + 1'b1;
+    end else if (rst_cycles == 16'hD4FD) begin
+        rst_cycles <= rst_cycles + 1'b1;                         
+        if (!cpu_rw && cpu_addr == 3'h2) begin  
+            cpu_dout <= ppuctrl;
+            ppustatus[7] <= 1'b0;
         end
-    end else begin // We can now begin our regular read/write routine
-        if (!cpu_rw) begin
-            
+    end else begin                              // We can now begin our regular read/write routine
+        if (!cpu_rw) begin                 // Read
+            case (cpu_addr)
+                3'h0: begin
+                    cpu_dout <= ppustatus;
+                    foreach(ppustatus[i]) // Clear status flags after read
+                        ppustatus[i] == 1'b1 -> ppustatus[i] <= 1'b0;
+                end
+                3'h4: begin
+                    cpu_dout <= oamdata;
+                end
+                3'h7: begin
+                    cpu_dout <= ppudata;
+                end
+                default: cpu_dout <= 7'h77; // Test value to make sure we do not allow illegal reads
+            endcase
+        end
+        if (cpu_rw) begin // Write
+            if (scroll_msb) begin // Scroll register is written to in 2 writes
+                ppuscroll[7:0] <= cpu_din;
+                scroll_msb <= 1'b0;
+            end
+            else begin
+                case (cpu_addr)
+                    3'h0: ppuctrl <= cpu_din;
+                    3'h1: ppumask <= cpu_din;
+                    3'h3: oamaddr <= cpu_din;
+                    3'h4: oamdata <= cpu_din;
+                    3'h5: begin 
+                        ppuscroll[15:8] <= cpu_din;
+                        scroll_msb <= 1'b1;
+                    end
+                    3'h6: ppuaddr <= cpu_din;
+                    default: 
+                endcase
+            end
         end
     end
 end
